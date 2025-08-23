@@ -1,7 +1,7 @@
-import 'package:audioplayers/audioplayers.dart';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:hello_flutter/utils/sound_manager.dart';
-import 'dart:math';
 
 import '../gen/assets.gen.dart';
 import '../logic/board_logic.dart';
@@ -58,7 +58,7 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
       rows: 9,
       cols: 17,
       allIcons: Assets.icons.values,
-      iconVariety: 30,
+      iconVariety: Assets.icons.values.length,
     );
   }
 

@@ -1,42 +1,35 @@
 #!/bin/bash
+# 一键部署 Flutter Web 到 GitHub Pages
+# 使用前先确保 flutter 在 PATH，并且本地已配置 git
 
-# ---------------------------
-# Flutter Web 一键推送到 GitHub + 部署 Web
-# ---------------------------
+# ⚠️ 修改这里为你的仓库名
+REPO_NAME="Lianliankan"
+GITHUB_URL="https://github.com/13574091029/$REPO_NAME.git"
 
-# 配置国内镜像加速（可选）
-export PUB_HOSTED_URL=https://pub.flutter-io.cn
-export FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn
-
-# 项目远程仓库地址（替换成你自己的）
-GITHUB_REPO="https://github.com/13574091029/Lianliankan.git"
-
-# 1. 初始化本地 Git（如果已经初始化，可跳过）
-if [ ! -d ".git" ]; then
-  git init
-  git remote add origin $GITHUB_REPO
-fi
-
-# 2. 提交 Flutter 项目代码
-git add .
-git commit -m "Update Flutter project" || echo "Nothing to commit"
-git branch -M main
-git push -u origin main
-
-# 3. 构建 Web release
+# 1️⃣ 清理旧的构建
+echo "清理旧构建..."
 flutter clean
 flutter pub get
-flutter build web --release
 
-# 4. 进入 build/web 推送到 gh-pages 分支
-cd build/web
+# 2️⃣ 构建 release Web
+echo "构建 Flutter Web..."
+flutter build web --release --base-href "/$REPO_NAME/"
 
-git init
+# 3️⃣ 进入 build/web
+cd build/web || exit
+
+# 4️⃣ 初始化 git（如果第一次部署）
+if [ ! -d ".git" ]; then
+    git init
+    git branch -M gh-pages
+    git remote add origin $GITHUB_URL
+fi
+
+# 5️⃣ 提交并推送到 gh-pages
+echo "推送到 gh-pages..."
 git add .
-git commit -m "Deploy Flutter Web"
-git branch -M gh-pages
-git remote add origin $GITHUB_REPO || true
+git commit -m "Deploy Flutter Web $(date '+%Y-%m-%d %H:%M:%S')" -q
 git push -f origin gh-pages
 
-echo "✅ Flutter Web 已部署到 GitHub Pages"
-echo "访问链接: https://13574091029.github.io/Lianliankan/"
+echo "部署完成！"
+echo "访问: https://13574091029.github.io/$REPO_NAME/"
