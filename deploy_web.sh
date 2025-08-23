@@ -39,4 +39,4 @@ git remote add origin $GITHUB_REPO || true
 git push -f origin gh-pages
 
 echo "✅ Flutter Web 已部署到 GitHub Pages"
-echo "访问链接: https://<13574091029>.github.io/Lianliankan/"
+echo "访问链接: https://13574091029.github.io/Lianliankan/"
