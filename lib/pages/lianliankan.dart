@@ -5,6 +5,7 @@ import 'package:hello_flutter/utils/sound_manager.dart';
 
 import '../gen/assets.gen.dart';
 import '../logic/board_logic.dart';
+import '../utils/game_timer.dart';
 
 class GamePage extends StatefulWidget {
   const GamePage({super.key});
@@ -24,10 +25,13 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
   late Animation<double> _hintAnimation;
   List<Point<int>> hintPoints = []; // 保存闪烁的两格坐标
 
+  final GameTimer gameTimer = GameTimer(); // 计时器
+
   @override
   void dispose() {
     SoundManager().dispose();
     _hintController.dispose();
+    gameTimer.dispose();
     super.dispose();
   }
 
@@ -35,6 +39,8 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
   void initState() {
     super.initState();
     _initLogic();
+    gameTimer.loadBestRecord(); // 初始化时加载历史纪录
+    gameTimer.start(); // 游戏开始时启动计时器
 
     _hintController = AnimationController(
       vsync: this,
@@ -55,8 +61,8 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
 
   void _initLogic() {
     logic = BoardLogic(
-      rows: 9,
-      cols: 17,
+      rows: 3,
+      cols: 5,
       allIcons: Assets.icons.values,
       iconVariety: Assets.icons.values.length,
     );
@@ -128,12 +134,20 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
     return true;
   }
 
-  void _showWinDialog() {
+  Future<void> _showWinDialog() async {
+
+    Duration timeUsed = await gameTimer.stop();
+
+    String resultMsg = "你消除了所有图标！\n本次用时: ${timeUsed.inSeconds} 秒";
+    if (gameTimer.bestRecord != null) {
+      resultMsg += "\n最快纪录: ${gameTimer.bestRecord!.inSeconds} 秒";
+    }
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('恭喜！'),
-        content: const Text('你消除了所有图标！'),
+        content: Text(resultMsg),
         actions: [
           TextButton(
             onPressed: () {
@@ -141,6 +155,8 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
               setState(() {
                 _initLogic();
               });
+              gameTimer.reset(); // 重置计时器
+              gameTimer.start(); // 重新开始计时
             },
             child: const Text('再来一局'),
           )
@@ -200,6 +216,28 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
       appBar: AppBar(
         title: const Text('连连看'),
         actions: [
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              child: AnimatedBuilder(
+                animation: gameTimer,
+                builder: (_, __) {
+                  final best = gameTimer.bestRecord != null
+                      ? '${gameTimer.bestRecord!.inSeconds}s'
+                      : '--';
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('用时: ${gameTimer.formatDuration(gameTimer.elapsed)}',
+                          style: const TextStyle(fontSize: 14)),
+                      Text('最快: $best', style: const TextStyle(fontSize: 14)),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
           IconButton(
             icon: Icon(_isMuted ? Icons.volume_off : Icons.volume_up),
             onPressed: _toggleMute,
