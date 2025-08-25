@@ -3,8 +3,8 @@ name: Build Windows
 on:
   push:
     branches:
-      - main   # 当 main 分支有 push 时触发
-  workflow_dispatch:  # 允许手动触发
+      - main
+  workflow_dispatch:
 
 jobs:
   build-windows:
@@ -14,10 +14,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Flutter
+      - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "stable"
+          channel: stable
+          flutter-version: "3.35.1" # 指定一个稳定版本
+          architecture: x64
 
       - name: Enable Windows Desktop
         run: flutter config --enable-windows-desktop
