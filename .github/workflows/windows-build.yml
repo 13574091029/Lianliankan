@@ -16,7 +16,7 @@ jobs:
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.3' # 换成你需要的版本
+          flutter-version: '3.35.1' # 换成你本地 Flutter 版本
 
       - name: Enable Windows Desktop
         run: flutter config --enable-windows-desktop
@@ -28,7 +28,7 @@ jobs:
         run: flutter build windows --release
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: windows-exe
-          path: build/windows/x64/runner/Release/*.exe
+          path: build/windows/x64/Release/*.exe
