@@ -1,22 +1,23 @@
-name: Build Windows EXE
+name: Build Windows
 
 on:
   push:
-    branches: ["main"]  # 每次推送 main 分支时触发
-  workflow_dispatch:    # 也可以手动触发
+    branches:
+      - main   # 当 main 分支有 push 时触发
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
   build-windows:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.35.1' # 换成你本地 Flutter 版本
+          flutter-version: "stable"
 
       - name: Enable Windows Desktop
         run: flutter config --enable-windows-desktop
@@ -24,11 +25,11 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Build Windows EXE
+      - name: Build Windows Release
         run: flutter build windows --release
 
-      - name: Upload artifact
+      - name: Upload Windows exe
         uses: actions/upload-artifact@v4
         with:
-          name: windows-exe
-          path: build/windows/x64/Release/*.exe
+          name: Windows-Release
+          path: build/windows/runner/Release/*.exe
