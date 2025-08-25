@@ -61,8 +61,8 @@ class _GamePageState extends State<GamePage> with SingleTickerProviderStateMixin
 
   void _initLogic() {
     logic = BoardLogic(
-      rows: 3,
-      cols: 5,
+      rows: 9,
+      cols: 17,
       allIcons: Assets.icons.values,
       iconVariety: Assets.icons.values.length,
     );
