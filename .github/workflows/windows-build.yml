@@ -3,15 +3,15 @@ name: Build Windows Release
 on:
   push:
     tags:
-      - 'v*'  # 只有打 tag 才触发
-  workflow_dispatch:
+      - 'v*'        # 只有打 tag 才触发
+  workflow_dispatch: # 可以手动触发
 
 jobs:
   build-windows:
     runs-on: windows-latest
 
     steps:
-      # 1. 检出代码
+      # 1. 拉取代码
       - name: Checkout code
         uses: actions/checkout@v3
 
@@ -20,10 +20,10 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.35.1"
+          flutter-version: '3.35.1'
           architecture: x64
 
-      # 3. 启用 Windows Desktop
+      # 3. 启用 Windows Desktop 支持
       - name: Enable Windows Desktop
         run: flutter config --enable-windows-desktop
 
@@ -31,31 +31,22 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      # 5. 构建 Windows release
+      # 5. 构建 Windows Release
       - name: Build Windows Release
         run: flutter build windows --release
 
-      # 6. 查看 build 目录，确认输出
-      - name: Check build output
-        run: dir build\windows\ -Recurse
-
-      # 7. 压缩 exe 和 DLL
+      # 6. 打包 exe 文件及依赖
       - name: Zip Windows build
-        shell: powershell
         run: |
-          $srcPath = "build\windows\x64\Release\Runner"
-          if (Test-Path $srcPath) {
-            Write-Host "Found build output at $srcPath"
-            $zipPath = "build\flutter_windows_app.zip"
-            Compress-Archive -Path "$srcPath\*" -DestinationPath $zipPath -Force
-            Write-Host "Zip created at $zipPath"
-          } else {
+          $srcPath = "build/windows/runner/Release"
+          if (-Not (Test-Path $srcPath)) {
             Write-Error "$srcPath does not exist. Build might have failed."
             exit 1
           }
+          Compress-Archive -Path "$srcPath\*" -DestinationPath "build/flutter_windows_app.zip"
 
-      # 8. 上传到 GitHub release
-      - name: Upload to GitHub Release
+      # 7. 上传 zip 到 Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: build/flutter_windows_app.zip
