@@ -30,9 +30,9 @@ jobs:
       - name: Build Windows Release
         run: flutter build windows --release
 
-      - name: Zip Windows release (full)
+      - name: Zip Windows build
         run: |
-          $srcPath = "build/windows/runner/Release"
+          $srcPath = "build/windows/x64/Release"
           if (-Not (Test-Path $srcPath)) {
             Write-Error "$srcPath does not exist. Build might have failed."
             exit 1
