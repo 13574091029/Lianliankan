@@ -1,14 +1,18 @@
-# 在 if(FLUTTER_TARGET_PLATFORM_SYSTEM_VERSION) 之前添加以下内容
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    # 对于 MSVC 编译器，设置运行时库为多线程DLL版本（非调试）
-    if(MSVC)
-        add_compile_options(
-            "$<$<CONFIG:Release>:/MT>"
-        )
-        add_link_options(
-            "$<$<CONFIG:Release>:/MT>"
-        )
-    endif()
+# 在文件顶部附近添加
+cmake_minimum_required(VERSION 3.10)
+
+# 在 if(FLUTTER_TARGET_PLATFORM_SYSTEM_VERSION) 之前添加
+if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MSVC)
+    # 强制使用多线程非调试运行时库
+    add_compile_options(
+        "$<$<CONFIG:Release>:/MT>"
+    )
+    add_link_options(
+        "$<$<CONFIG:Release>:/MT>"
+    )
+    
+    # 明确设置运行时库属性
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
 endif()
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
