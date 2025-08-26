@@ -1,9 +1,13 @@
-name: Build Windows Release
+name: Build Windows
 
 on:
   push:
     tags:
       - 'v*'  # 只有打 tag 才触发
+    branches:
+      - main
+  release:
+    types: [created]
   workflow_dispatch:
 
 jobs:
@@ -11,38 +15,29 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # 1. 检出代码
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. 安装 Flutter
-      - name: Setup Flutter
+      - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.35.1"
           channel: stable
+          flutter-version: "3.35.1"
           architecture: x64
 
-      # 3. 启用 Windows Desktop 支持
       - name: Enable Windows Desktop
         run: flutter config --enable-windows-desktop
 
-      # 4. 安装依赖
       - name: Get dependencies
         run: flutter pub get
 
-      # 5. 构建 Windows Release
       - name: Build Windows Release
         run: flutter build windows --release
 
-      # 6. 列出 build/windows 目录，确认生成文件
-      - name: List build/windows directory
-        run: Get-ChildItem -Path build/windows -Recurse
-
-      # 7. 压缩 exe 文件
       - name: Zip Windows build
+        shell: powershell
         run: |
-          $srcPath = "build/windows/runner/Release"
+          $srcPath = "build/windows/x64/Release"
           if (Test-Path $srcPath) {
             Write-Host "Found build output at $srcPath"
             mkdir build/windows/release_zip
@@ -54,7 +49,12 @@ jobs:
             exit 1
           }
 
-      # 8. 上传到 GitHub Release
+      - name: Upload artifact (optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-Zip
+          path: build/flutter_windows_app.zip
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
