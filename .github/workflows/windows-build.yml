@@ -1,9 +1,10 @@
 name: Build Windows Release
 
+# 只有 push tag 时触发
 on:
   push:
     tags:
-      - 'v*' # 例如 v1.0.0
+      - 'v*'  # 例如 v1.0.0
   workflow_dispatch:
 
 jobs:
@@ -11,11 +12,9 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # 1. 拉取代码
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # 2. 安装 Flutter
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -23,42 +22,24 @@ jobs:
           flutter-version: "3.35.1"
           architecture: x64
 
-      # 3. 启用 Windows Desktop 支持
       - name: Enable Windows Desktop
         run: flutter config --enable-windows-desktop
 
-      # 4. 获取依赖
       - name: Get dependencies
         run: flutter pub get
 
-      # 5. 构建 Windows Release
       - name: Build Windows Release
         run: flutter build windows --release
 
-      # 6. 查找 exe 文件
-      - name: Find Windows build output
-        id: find_exe
+      - name: Prepare zip
         run: |
-          $exe = Get-ChildItem -Path build/windows/ -Recurse -Filter *.exe | Select-Object -First 1
-          echo "exe_path=$($exe.FullName)" >> $env:GITHUB_OUTPUT
+          mkdir -p build/windows/release_zip
+          Copy-Item -Path build/windows/runner/Release/* -Destination build/windows/release_zip -Recurse
+          Compress-Archive -Path build/windows/release_zip/* -DestinationPath build/flutter_windows_app.zip
 
-      # 7. 压缩 exe 所在目录
-      - name: Create ZIP of Release
-        id: zip_release
-        run: |
-          $exeFile = "${{ steps.find_exe.outputs.exe_path }}"
-          $exeDir = Split-Path $exeFile
-          $tag = "${{ github.ref_name }}"
-          $zipPath = "build/windows/${tag}.zip"
-          Compress-Archive -Path "$exeDir\*" -DestinationPath $zipPath
-          echo "zip_path=$zipPath" >> $env:GITHUB_OUTPUT
-
-      # 8. 上传到 GitHub Release
-      - name: Upload to GitHub Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          files: ${{ steps.zip_release.outputs.zip_path }}
+          files: build/flutter_windows_app.zip
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 必须有 write permissions
