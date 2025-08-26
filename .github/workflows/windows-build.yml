@@ -3,7 +3,7 @@ name: Build Windows Release
 on:
   push:
     tags:
-      - 'v*'  # 只在打 tag 时触发
+      - 'v*'   # 只有打 tag 才触发
   workflow_dispatch:
 
 jobs:
@@ -11,11 +11,11 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # 1. 拉取代码
+      # 1. Checkout
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. 安装 Flutter
+      # 2. Install Flutter
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -23,24 +23,24 @@ jobs:
           flutter-version: "3.35.1"
           architecture: x64
 
-      # 3. 启用 Windows Desktop 支持
-      - name: Enable Windows Desktop
+      # 3. Enable Windows desktop
+      - name: Enable Windows desktop
         run: flutter config --enable-windows-desktop
 
-      # 4. 获取依赖
-      - name: Get dependencies
+      # 4. Get dependencies
+      - name: Get Flutter dependencies
         run: flutter pub get
 
-      # 5. 构建 Windows release
-      - name: Build Windows Release
+      # 5. Build Windows release
+      - name: Build Windows release
         run: flutter build windows --release
 
-      # 6. 调试：列出 build/windows 内容（可选）
-      - name: List build/windows
-        run: dir build/windows /s
+      # 6. 查看 build/windows 目录
+      - name: List build/windows directory
+        run: Get-ChildItem -Path build/windows -Recurse
 
-      # 7. 压缩 Release 文件夹
-      - name: Prepare zip
+      # 7. 压缩 exe 文件和相关依赖
+      - name: Zip Windows build
         run: |
           mkdir build/windows/release_zip
           Copy-Item -Path build/windows/runner/Release/* -Destination build/windows/release_zip -Recurse
