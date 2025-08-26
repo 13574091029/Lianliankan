@@ -3,26 +3,24 @@ name: Build Windows Release
 on:
   push:
     tags:
-      - 'v*'  # 仅在 push tag 时触发
+      - 'v*'
   workflow_dispatch:
 
-# 为整个工作流设置默认权限
 permissions:
-  contents: write  # 关键：授予创建 Release 和上传资产的权限
+  contents: write
 
 jobs:
   build-windows:
     runs-on: windows-latest
 
-    # 也可以仅在特定作业中设置权限（二选一）
-    # permissions:
-    #   contents: write
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
         with:
-          fetch-depth: 0  # 获取所有历史记录和标签，有助于某些 Actions 识别 tag
+          arch: x64
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2
@@ -42,7 +40,29 @@ jobs:
       - name: Build Windows Release
         run: |
           flutter clean
+          # 设置环境变量确保使用发布版运行时
+          $env:CMAKE_BUILD_TYPE = "Release"
           flutter build windows --release --dart-define=CMAKE_BUILD_TYPE=Release
+
+      - name: Verify EXE dependencies
+        run: |
+          # 找到可执行文件
+          $exe = Get-ChildItem -Path build\windows -Recurse -Filter *.exe | Where-Object { $_.Name -notlike "*flutter*" } | Select-Object -First 1
+          if (-not $exe) {
+            Write-Error "No exe found."
+            exit 1
+          }
+          
+          # 使用 dumpbin 检查依赖
+          Write-Host "Checking dependencies of $($exe.FullName)"
+          & "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\bin\Hostx64\x64\dumpbin.exe" /dependents $exe.FullName
+          
+          # 检查是否包含调试版 DLL
+          $dependencies = & "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\bin\Hostx64\x64\dumpbin.exe" /dependents $exe.FullName
+          if ($dependencies -match "ucrtbased.dll|VCRUNTIME140D.dll") {
+            Write-Error "EXE still depends on debug DLLs!"
+            exit 1
+          }
 
       - name: Find Windows exe
         id: find_exe
@@ -67,8 +87,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: build/flutter_windows_app.zip
-          tag_name: ${{ github.ref_name }}  # 明确指定标签名称
-        # env 部分通常可省略，因为默认使用 GITHUB_TOKEN
-        # 但如果需要，也可以显式设置：
-        # env:
-        #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ github.ref_name }}
