@@ -3,7 +3,7 @@ name: Build Windows Release
 on:
   push:
     tags:
-      - 'v*'  # 只在打版本 tag 时触发
+      - 'v*' # 例如 v1.0.0
   workflow_dispatch:
 
 jobs:
@@ -11,9 +11,9 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # 1. 获取代码
+      # 1. 拉取代码
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       # 2. 安装 Flutter
       - name: Install Flutter
@@ -23,7 +23,7 @@ jobs:
           flutter-version: "3.35.1"
           architecture: x64
 
-      # 3. 启用 Windows Desktop
+      # 3. 启用 Windows Desktop 支持
       - name: Enable Windows Desktop
         run: flutter config --enable-windows-desktop
 
@@ -35,19 +35,30 @@ jobs:
       - name: Build Windows Release
         run: flutter build windows --release
 
-      # 6. 压缩 Release 文件夹成 ZIP
-      - name: Create ZIP of Release
+      # 6. 查找 exe 文件
+      - name: Find Windows build output
+        id: find_exe
         run: |
-          mkdir build/windows/release_zip
-          powershell Compress-Archive -Path build/windows/runner/Release -DestinationPath build/windows/release_zip/${{ github.ref_name }}.zip
+          $exe = Get-ChildItem -Path build/windows/ -Recurse -Filter *.exe | Select-Object -First 1
+          echo "exe_path=$($exe.FullName)" >> $env:GITHUB_OUTPUT
 
-      # 7. 上传 ZIP 到 GitHub Release
-      - name: Create GitHub Release
-        id: gh_release
+      # 7. 压缩 exe 所在目录
+      - name: Create ZIP of Release
+        id: zip_release
+        run: |
+          $exeFile = "${{ steps.find_exe.outputs.exe_path }}"
+          $exeDir = Split-Path $exeFile
+          $tag = "${{ github.ref_name }}"
+          $zipPath = "build/windows/${tag}.zip"
+          Compress-Archive -Path "$exeDir\*" -DestinationPath $zipPath
+          echo "zip_path=$zipPath" >> $env:GITHUB_OUTPUT
+
+      # 8. 上传到 GitHub Release
+      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          files: build/windows/release_zip/${{ github.ref_name }}.zip
+          files: ${{ steps.zip_release.outputs.zip_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
