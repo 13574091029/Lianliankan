@@ -2,8 +2,9 @@ name: Deploy Flutter Web
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'   # 只有打 tag 才触发
+  workflow_dispatch:
 
 jobs:
   build:
