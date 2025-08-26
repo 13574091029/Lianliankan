@@ -42,7 +42,7 @@ jobs:
       - name: Build Windows Release
         run: |
           flutter clean
-          flutter build windows --release
+          flutter build windows --release --dart-define=CMAKE_BUILD_TYPE=Release
 
       - name: Find Windows exe
         id: find_exe
