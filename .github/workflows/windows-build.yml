@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2
@@ -37,20 +37,21 @@ jobs:
       - name: Find Windows exe
         id: find_exe
         run: |
-          $exe = Get-ChildItem -Path build/windows -Recurse -Filter *.exe | Select-Object -First 1
+          $exe = Get-ChildItem -Path build\windows -Recurse -Filter *.exe | Where-Object { $_.Name -notlike "*flutter*" } | Select-Object -First 1
           if (-not $exe) {
             Write-Error "No exe found. Build might have failed."
             exit 1
           }
           echo "Found exe at $($exe.FullName)"
-          echo "exe_path=$($exe.FullName)" >> $GITHUB_OUTPUT
+          echo "exe_path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Create zip
         run: |
-          $zipDir = "build/windows/release_zip"
-          mkdir $zipDir
-          Copy-Item -Path ${{ steps.find_exe.outputs.exe_path }} -Destination $zipDir
-          Compress-Archive -Path "$zipDir/*" -DestinationPath "build/flutter_windows_app.zip"
+          $zipDir = "build\windows\release_zip"
+          New-Item -ItemType Directory -Path $zipDir -Force
+          Copy-Item -Path "${{ steps.find_exe.outputs.exe_path }}" -Destination $zipDir
+          $exeName = [System.IO.Path]::GetFileName("${{ steps.find_exe.outputs.exe_path }}")
+          Compress-Archive -Path "$zipDir\$exeName" -DestinationPath "build\flutter_windows_app.zip" -Force
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
