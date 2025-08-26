@@ -43,61 +43,72 @@ jobs:
           # 设置环境变量确保使用发布版运行时
           $env:CMAKE_BUILD_TYPE = "Release"
           flutter build windows --release --dart-define=CMAKE_BUILD_TYPE=Release
-          
-      - name: Verify EXE dependencies
-        run: |
-          # 找到可执行文件
-          $exe = Get-ChildItem -Path build\windows -Recurse -Filter *.exe | Where-Object { $_.Name -notlike "*flutter*" } | Select-Object -First 1
-          if (-not $exe) {
-            Write-Error "No exe found."
-            exit 1
-          }
-          
-          Write-Host "Checking dependencies of $($exe.FullName)"
-          
-          # 方法一：尝试使用 vswhere 定位 dumpbin.exe (更可靠)
-          # 首先尝试找到最新版本的 Visual Studio 安装路径中的 dumpbin
-          $vswherePath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          if (Test-Path $vswherePath) {
-            $vsInstallPath = & $vswherePath -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-            $dumpbinPath = Join-Path $vsInstallPath "VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe"
-            $dumpbinPath = (Get-Item $dumpbinPath).FullName | Select-Object -First 1
-          }
-          
-          # 方法二：如果 vswhere 没找到，尝试一个常见的路径
-          if (-not $dumpbinPath -or -not (Test-Path $dumpbinPath)) {
-            $potentialDumpbinPath = "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\14.29.30133\bin\Hostx64\x64\dumpbin.exe"
-            if (Test-Path $potentialDumpbinPath) {
-              $dumpbinPath = $potentialDumpbinPath
-            }
-          }
-          
-          # 如果找到了 dumpbin.exe，执行检查
-          if ($dumpbinPath -and (Test-Path $dumpbinPath)) {
-            Write-Host "Using dumpbin at: $dumpbinPath"
-            & $dumpbinPath /dependents $exe.FullName
-            
-            # 检查是否仍然依赖调试版 DLL
-            $dependencies = & $dumpbinPath /dependents $exe.FullName
-            if ($dependencies -match "ucrtbased\.dll|VCRUNTIME140D\.dll") {
-              Write-Error "EXE still depends on debug DLLs!"
-              exit 1
-            }
-          } else {
-            Write-Warning "dumpbin.exe not found. Skipping dependency verification."
-            # 这里不要退出，因为构建本身可能是成功的，只是验证步骤跳过
-          }
 
       - name: Find Windows exe
         id: find_exe
         run: |
-          $exe = Get-ChildItem -Path build\windows -Recurse -Filter *.exe | Where-Object { $_.Name -notlike "*flutter*" } | Select-Object -First 1
+          # 查找应用程序的主要可执行文件，通常在 runner/Release 目录下
+          $exe = Get-ChildItem -Path build\windows\runner\Release -Filter *.exe | Where-Object { $_.Name -notlike "*flutter*" } | Select-Object -First 1
           if (-not $exe) {
-            Write-Error "No exe found. Build might have failed."
+            Write-Error "No application exe found in runner/Release. Build might have failed."
             exit 1
           }
-          echo "Found exe at $($exe.FullName)"
+          echo "Found application exe at $($exe.FullName)"
           echo "exe_path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Verify EXE dependencies
+        run: |
+          # 使用上一步找到的应用程序 exe 文件
+          $exePath = "${{ steps.find_exe.outputs.exe_path }}"
+          Write-Host "Checking dependencies of application: $exePath"
+          
+          # 尝试找到 dumpbin.exe
+          $vswherePath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $dumpbinPath = $null
+          
+          if (Test-Path $vswherePath) {
+            $vsInstallPath = & $vswherePath -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+            $potentialDumpbinPath = Join-Path $vsInstallPath "VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe"
+            $dumpbinPath = (Get-Item $potentialDumpbinPath -ErrorAction SilentlyContinue).FullName | Select-Object -First 1
+          }
+          
+          # 如果没找到，尝试其他可能路径
+          if (-not $dumpbinPath -or -not (Test-Path $dumpbinPath)) {
+            $potentialPaths = @(
+              "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe",
+              "C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe",
+              "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe",
+              "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe",
+              "C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe",
+              "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe"
+            )
+            
+            foreach ($path in $potentialPaths) {
+              $foundPath = (Get-Item $path -ErrorAction SilentlyContinue).FullName | Select-Object -First 1
+              if ($foundPath -and (Test-Path $foundPath)) {
+                $dumpbinPath = $foundPath
+                break
+              }
+            }
+          }
+          
+          if ($dumpbinPath -and (Test-Path $dumpbinPath)) {
+            Write-Host "Using dumpbin at: $dumpbinPath"
+            
+            # 检查依赖项
+            $dependencies = & $dumpbinPath /dependents $exePath
+            Write-Host $dependencies
+            
+            # 检查是否包含调试版 DLL
+            if ($dependencies -match "ucrtbased\.dll|VCRUNTIME140D\.dll") {
+              Write-Error "Application EXE still depends on debug DLLs!"
+              exit 1
+            } else {
+              Write-Host "Application EXE does not depend on debug DLLs. Good!"
+            }
+          } else {
+            Write-Warning "dumpbin.exe not found. Skipping dependency verification."
+          }
 
       - name: Create zip
         run: |
