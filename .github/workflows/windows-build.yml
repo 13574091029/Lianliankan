@@ -3,50 +3,53 @@ name: Build Windows Release
 on:
   push:
     tags:
-      - 'v*'        # 只有打 tag 才触发
-  workflow_dispatch: # 可以手动触发
+      - 'v*'  # 例如 v1.0.0
+  workflow_dispatch:
 
 jobs:
   build-windows:
     runs-on: windows-latest
 
     steps:
-      # 1. 拉取代码
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2. 安装 Flutter
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
           flutter-version: '3.35.1'
+          channel: stable
           architecture: x64
 
-      # 3. 启用 Windows Desktop 支持
-      - name: Enable Windows Desktop
+      - name: Enable Windows desktop
         run: flutter config --enable-windows-desktop
 
-      # 4. 获取依赖
       - name: Get dependencies
         run: flutter pub get
 
-      # 5. 构建 Windows Release
       - name: Build Windows Release
         run: flutter build windows --release
 
-      # 6. 打包 exe 文件及依赖
-      - name: Zip Windows build
+      - name: Zip Windows release (full)
         run: |
           $srcPath = "build/windows/runner/Release"
           if (-Not (Test-Path $srcPath)) {
             Write-Error "$srcPath does not exist. Build might have failed."
             exit 1
           }
-          Compress-Archive -Path "$srcPath\*" -DestinationPath "build/flutter_windows_app.zip"
+          $zipPath = "build/flutter_windows_app.zip"
+          if (Test-Path $zipPath) { Remove-Item $zipPath }
+          Compress-Archive -Path "$srcPath\*" -DestinationPath $zipPath
 
-      # 7. 上传 zip 到 Release
       - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Windows zip to release
         uses: softprops/action-gh-release@v2
         with:
           files: build/flutter_windows_app.zip
