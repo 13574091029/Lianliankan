@@ -57,5 +57,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: build/flutter_windows_app.zip
+          tag_name: ${{ github.ref_name }}  # 明确指定标签名称
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
