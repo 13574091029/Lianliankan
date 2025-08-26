@@ -33,10 +33,10 @@ jobs:
 
       - name: Prepare zip
         run: |
-          mkdir -p build/windows/release_zip
-          Copy-Item -Path build/windows/runner/Release/* -Destination build/windows/release_zip -Recurse
+          mkdir build/windows/release_zip
+          Copy-Item -Path build/windows/x64/Release/* -Destination build/windows/release_zip -Recurse
           Compress-Archive -Path build/windows/release_zip/* -DestinationPath build/flutter_windows_app.zip
-
+          
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
