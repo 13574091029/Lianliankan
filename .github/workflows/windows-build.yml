@@ -6,13 +6,23 @@ on:
       - 'v*'  # 仅在 push tag 时触发
   workflow_dispatch:
 
+# 为整个工作流设置默认权限
+permissions:
+  contents: write  # 关键：授予创建 Release 和上传资产的权限
+
 jobs:
   build-windows:
     runs-on: windows-latest
 
+    # 也可以仅在特定作业中设置权限（二选一）
+    # permissions:
+    #   contents: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # 获取所有历史记录和标签，有助于某些 Actions 识别 tag
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2
@@ -58,5 +68,7 @@ jobs:
         with:
           files: build/flutter_windows_app.zip
           tag_name: ${{ github.ref_name }}  # 明确指定标签名称
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # env 部分通常可省略，因为默认使用 GITHUB_TOKEN
+        # 但如果需要，也可以显式设置：
+        # env:
+        #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
