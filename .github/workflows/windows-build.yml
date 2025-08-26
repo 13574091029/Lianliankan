@@ -1,40 +1,42 @@
-name: Build Windows
+name: Build and Release Flutter Windows App
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    tags:
+      - "v*"   # 只有打 tag（例如 v1.0.0）时才会触发
+  workflow_dispatch:  # 也可以手动触发
 
 jobs:
-  build-windows:
+  build:
     runs-on: windows-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4   # 建议用最新的 v4
+        uses: actions/checkout@v4
 
-      - name: Install Flutter
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.35.1"
-          architecture: x64
+          flutter-version: "3.35.1" # 可以改成你实际用的版本
 
-      - name: Enable Windows Desktop
+      - name: Enable Windows support
         run: flutter config --enable-windows-desktop
 
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Build Windows Release
+      - name: Build Windows app
         run: flutter build windows --release
 
-      - name: List build output (调试用，可以删)
-        run: ls build/windows/x64/runner/Release
+      - name: Archive Release
+        run: |
+          cd build\windows\x64\runner\Release
+          powershell Compress-Archive * ../../../flutter_windows_app.zip
 
-      - name: Upload Windows exe
-        uses: actions/upload-artifact@v4
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: Windows-Release
-          path: build/windows/x64/runner/Release/*.exe
+          files: build/flutter_windows_app.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
