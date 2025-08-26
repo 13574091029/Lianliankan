@@ -11,9 +11,11 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # 1. 检出代码
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # 2. 安装 Flutter
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -21,34 +23,39 @@ jobs:
           flutter-version: "3.35.1"
           architecture: x64
 
+      # 3. 启用 Windows Desktop
       - name: Enable Windows Desktop
         run: flutter config --enable-windows-desktop
 
+      # 4. 获取依赖
       - name: Get dependencies
         run: flutter pub get
 
+      # 5. 构建 Windows release
       - name: Build Windows Release
         run: flutter build windows --release
 
+      # 6. 查看 build 目录，确认输出
       - name: Check build output
-        run: dir build/windows -Recurse
+        run: dir build\windows\ -Recurse
 
+      # 7. 压缩 exe 和 DLL
       - name: Zip Windows build
         shell: powershell
         run: |
-          $srcPath = "build/windows/runner/Release"
+          $srcPath = "build\windows\x64\Release\Runner"
           if (Test-Path $srcPath) {
             Write-Host "Found build output at $srcPath"
-            mkdir build/windows/release_zip
-            Copy-Item -Path "$srcPath/*" -Destination build/windows/release_zip -Recurse
-            Compress-Archive -Path build/windows/release_zip/* -DestinationPath build/flutter_windows_app.zip
-            Write-Host "Zip created at build/flutter_windows_app.zip"
+            $zipPath = "build\flutter_windows_app.zip"
+            Compress-Archive -Path "$srcPath\*" -DestinationPath $zipPath -Force
+            Write-Host "Zip created at $zipPath"
           } else {
             Write-Error "$srcPath does not exist. Build might have failed."
             exit 1
           }
 
-      - name: Create GitHub Release
+      # 8. 上传到 GitHub release
+      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: build/flutter_windows_app.zip
