@@ -3,7 +3,7 @@ name: Build Windows Release
 on:
   push:
     tags:
-      - 'v*'  # 例如 v1.0.0
+      - 'v*'  # 仅在 push tag 时触发
   workflow_dispatch:
 
 jobs:
@@ -11,45 +11,48 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.35.1'
           channel: stable
-          architecture: x64
+          flutter-version: "3.35.1"
 
-      - name: Enable Windows desktop
+      - name: Enable Windows Desktop
         run: flutter config --enable-windows-desktop
+
+      - name: Doctor
+        run: flutter doctor -v
 
       - name: Get dependencies
         run: flutter pub get
 
       - name: Build Windows Release
-        run: flutter build windows --release
-
-      - name: Zip Windows build
         run: |
-          $srcPath = "build/windows/x64/Release"
-          if (-Not (Test-Path $srcPath)) {
-            Write-Error "$srcPath does not exist. Build might have failed."
+          flutter clean
+          flutter build windows --release
+
+      - name: Find Windows exe
+        id: find_exe
+        run: |
+          $exe = Get-ChildItem -Path build/windows -Recurse -Filter *.exe | Select-Object -First 1
+          if (-not $exe) {
+            Write-Error "No exe found. Build might have failed."
             exit 1
           }
-          $zipPath = "build/flutter_windows_app.zip"
-          if (Test-Path $zipPath) { Remove-Item $zipPath }
-          Compress-Archive -Path "$srcPath\*" -DestinationPath $zipPath
+          echo "Found exe at $($exe.FullName)"
+          echo "exe_path=$($exe.FullName)" >> $GITHUB_OUTPUT
+
+      - name: Create zip
+        run: |
+          $zipDir = "build/windows/release_zip"
+          mkdir $zipDir
+          Copy-Item -Path ${{ steps.find_exe.outputs.exe_path }} -Destination $zipDir
+          Compress-Archive -Path "$zipDir/*" -DestinationPath "build/flutter_windows_app.zip"
 
       - name: Create GitHub Release
-        id: create_release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Windows zip to release
         uses: softprops/action-gh-release@v2
         with:
           files: build/flutter_windows_app.zip
