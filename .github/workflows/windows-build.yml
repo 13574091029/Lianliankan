@@ -1,40 +1,62 @@
-name: Build and Release Flutter Windows App
+name: Build Windows Release
 
 on:
   push:
-    tags:
-      - "v*"   # 只有打 tag（例如 v1.0.0）时才会触发
-  workflow_dispatch:  # 也可以手动触发
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
 
     steps:
+      # 1. Checkout 代码
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Set up Flutter
+      # 2. 安装 Flutter
+      - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.35.1" # 可以改成你实际用的版本
+          flutter-version: "3.35.1"
+          architecture: x64
 
-      - name: Enable Windows support
+      # 3. 启用 Windows 桌面
+      - name: Enable Windows Desktop
         run: flutter config --enable-windows-desktop
 
-      - name: Get dependencies
+      # 4. 获取依赖
+      - name: Get Flutter dependencies
         run: flutter pub get
 
-      - name: Build Windows app
+      # 5. 打包 Windows Release
+      - name: Build Windows Release
         run: flutter build windows --release
 
-      - name: Archive Release
+      # 6. 压缩 exe 和依赖文件
+      - name: Compress Release
         run: |
-          cd build\windows\x64\runner\Release
-          powershell Compress-Archive * ../../../flutter_windows_app.zip
+          $output = "build/flutter_windows_app.zip"
+          if (Test-Path $output) { Remove-Item $output }
+          Compress-Archive -Path build/windows/x64/Release/* -DestinationPath $output
+          Write-Host "Archive created at $output"
 
-      - name: Upload to GitHub Release
+      # 7. 创建 GitHub Release（如果 tag 对应的 Release 不存在）
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.ref_name != '' && github.ref_name || 'v1.0.0' }}
+          release_name: Release ${{ github.ref_name != '' && github.ref_name || 'v1.0.0' }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 8. 上传压缩包到 Release
+      - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
           files: build/flutter_windows_app.zip
