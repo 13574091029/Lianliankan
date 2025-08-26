@@ -1,3 +1,10 @@
+# 禁用 MSVC 使用 Debug CRT
+if(MSVC)
+  add_compile_options(
+    $<$<CONFIG:Release>:/MT>
+    $<$<CONFIG:RelWithDebInfo>:/MT>
+  )
+endif()
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
 project(hello_flutter LANGUAGES CXX)
