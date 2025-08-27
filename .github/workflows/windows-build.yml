@@ -42,19 +42,50 @@ jobs:
           flutter clean
           # 设置环境变量确保使用发布版运行时
           $env:CMAKE_BUILD_TYPE = "Release"
-          flutter build windows --release --dart-define=CMAKE_BUILD_TYPE=Release
+          flutter build windows --release --dart-define=CMAKE_BUILD_TYPE=Release --verbose > build_log.txt 2>&1 || type build_log.txt
+          # 即使构建命令返回错误，也继续执行后续步骤以便查看日志
+
+      - name: Check build artifacts
+        run: |
+          # 列出 build 目录内容，查看构建产生了什么
+          Write-Host "Contents of build directory:"
+          Get-ChildItem -Path build -Recurse -Name -ErrorAction SilentlyContinue
+          # 如果 build/windows 存在，特别列出其内容
+          if (Test-Path -Path "build\windows") {
+            Write-Host "Contents of build/windows directory:"
+            Get-ChildItem -Path build\windows -Recurse -Name -ErrorAction SilentlyContinue
+          }
 
       - name: Find Windows exe
         id: find_exe
         run: |
-          # 查找应用程序的主要可执行文件，通常在 runner/Release 目录下
-          $exe = Get-ChildItem -Path build\windows\runner\Release -Filter *.exe | Where-Object { $_.Name -notlike "*flutter*" } | Select-Object -First 1
-          if (-not $exe) {
-            Write-Error "No application exe found in runner/Release. Build might have failed."
-            exit 1
-          }
-          echo "Found application exe at $($exe.FullName)"
-          echo "exe_path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          # 更灵活地查找可执行文件，避免因路径变化而失败
+          # 首先尝试在可能的多个位置查找
+          $potentialPaths = @(
+            "build\windows\runner\Release\*.exe",
+            "build\windows\x64\runner\Release\*.exe",
+            "build\windows\**\*.exe"  # 递归查找
+          )
+
+          $exe = $null
+            foreach ($path in $potentialPaths) {
+              $found = Get-ChildItem -Path $path -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*flutter*" } | Select-Object -First 1
+              if ($found) {
+                $exe = $found
+                break
+              }
+            }
+            
+            if (-not $exe) {
+              # 如果没找到，列出所有可能的.exe文件以便调试
+              Write-Warning "No application exe found in usual locations. Listing all exe files in build directory:"
+              Get-ChildItem -Path build -Recurse -Filter *.exe -File -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "Found: $($_.FullName)" }
+              Write-Error "No application exe found. Build might have failed or output location changed."
+              exit 1
+            }
+            
+            echo "Found application exe at $($exe.FullName)"
+            echo "exe_path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Verify EXE dependencies
         run: |
