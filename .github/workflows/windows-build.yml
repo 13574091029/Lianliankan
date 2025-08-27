@@ -97,6 +97,10 @@ jobs:
           
           echo "Found application exe at $($exe.FullName)"
           echo "exe_path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          
+          # 同时保存 EXE 所在目录路径，用于后续步骤
+          $exeDir = [System.IO.Path]::GetDirectoryName($exe.FullName)
+          echo "exe_dir=$exeDir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Verify EXE dependencies
         run: |
@@ -152,13 +156,54 @@ jobs:
             Write-Warning "dumpbin.exe not found. Skipping dependency verification."
           }
 
+      - name: Gather DLL dependencies
+        run: |
+          # 获取 EXE 所在目录
+          $exeDir = "${{ steps.find_exe.outputs.exe_dir }}"
+          Write-Host "EXE directory: $exeDir"
+          
+          # 列出该目录中的所有 DLL 文件
+          $dllFiles = Get-ChildItem -Path $exeDir -Filter *.dll
+          Write-Host "Found DLL files:"
+          $dllFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
+          
+          # 检查是否包含 audioplayers_windows_plugin.dll
+          $audioPluginDll = $dllFiles | Where-Object { $_.Name -eq "audioplayers_windows_plugin.dll" }
+          if (-not $audioPluginDll) {
+            Write-Warning "audioplayers_windows_plugin.dll not found in $exeDir"
+            # 尝试在其他位置查找
+            $audioPluginDll = Get-ChildItem -Path build -Recurse -Filter "audioplayers_windows_plugin.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($audioPluginDll) {
+              Write-Host "Found audioplayers_windows_plugin.dll at: $($audioPluginDll.FullName)"
+            } else {
+              Write-Error "audioplayers_windows_plugin.dll not found anywhere!"
+              exit 1
+            }
+          }
+
       - name: Create zip
         run: |
+          # 获取 EXE 所在目录
+          $exeDir = "${{ steps.find_exe.outputs.exe_dir }}"
           $zipDir = "build\windows\release_zip"
           New-Item -ItemType Directory -Path $zipDir -Force
-          Copy-Item -Path "${{ steps.find_exe.outputs.exe_path }}" -Destination $zipDir
-          $exeName = [System.IO.Path]::GetFileName("${{ steps.find_exe.outputs.exe_path }}")
-          Compress-Archive -Path "$zipDir\$exeName" -DestinationPath "build\flutter_windows_app.zip" -Force
+          
+          # 复制 EXE 所在目录中的所有文件到 zip 目录
+          Write-Host "Copying all files from $exeDir to $zipDir"
+          Copy-Item -Path "$exeDir\*" -Destination $zipDir -Recurse
+          
+          # 确保也复制了数据目录（如 flutter_assets）
+          $dataDirs = @("flutter_assets", "data")
+          foreach ($dir in $dataDirs) {
+            $dataPath = Join-Path (Split-Path $exeDir -Parent) $dir
+            if (Test-Path $dataPath) {
+              Write-Host "Copying data directory: $dataPath"
+              Copy-Item -Path "$dataPath" -Destination $zipDir -Recurse
+            }
+          }
+          
+          # 创建 ZIP 文件
+          Compress-Archive -Path "$zipDir\*" -DestinationPath "build\flutter_windows_app.zip" -Force
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
