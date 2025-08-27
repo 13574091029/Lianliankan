@@ -59,33 +59,44 @@ jobs:
       - name: Find Windows exe
         id: find_exe
         run: |
-          # 更灵活地查找可执行文件，避免因路径变化而失败
-          # 首先尝试在可能的多个位置查找
+          # 更智能地查找可执行文件
+          # 首先尝试在 runner 目录中查找
           $potentialPaths = @(
-            "build\windows\runner\Release\*.exe",
             "build\windows\x64\runner\Release\*.exe",
-            "build\windows\**\*.exe"  # 递归查找
+            "build\windows\runner\Release\*.exe"
           )
-
+          
           $exe = $null
-            foreach ($path in $potentialPaths) {
-              $found = Get-ChildItem -Path $path -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*flutter*" } | Select-Object -First 1
-              if ($found) {
-                $exe = $found
-                break
-              }
+          foreach ($path in $potentialPaths) {
+            $found = Get-ChildItem -Path $path -File -ErrorAction SilentlyContinue | 
+                     Where-Object { $_.Name -notmatch "CompilerId|flutter_windows" } | 
+                     Select-Object -First 1
+            if ($found) {
+              $exe = $found
+              break
             }
-            
-            if (-not $exe) {
-              # 如果没找到，列出所有可能的.exe文件以便调试
-              Write-Warning "No application exe found in usual locations. Listing all exe files in build directory:"
-              Get-ChildItem -Path build -Recurse -Filter *.exe -File -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "Found: $($_.FullName)" }
-              Write-Error "No application exe found. Build might have failed or output location changed."
-              exit 1
-            }
-            
-            echo "Found application exe at $($exe.FullName)"
-            echo "exe_path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+          
+          # 如果没找到，尝试递归查找但不排除任何文件
+          if (-not $exe) {
+            $allExes = Get-ChildItem -Path build -Recurse -Filter *.exe -File -ErrorAction SilentlyContinue
+            $exe = $allExes | Where-Object { 
+              $_.FullName -match "runner.*Release" -and $_.Name -notmatch "CompilerId|flutter_windows"
+            } | Select-Object -First 1
+          }
+          
+          if (-not $exe) {
+            # 如果还是没找到，选择第一个不是 CompilerId 的 exe
+            $exe = $allExes | Where-Object { $_.Name -notmatch "CompilerId" } | Select-Object -First 1
+          }
+          
+          if (-not $exe) {
+            Write-Error "No application exe found. Build might have failed."
+            exit 1
+          }
+          
+          echo "Found application exe at $($exe.FullName)"
+          echo "exe_path=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Verify EXE dependencies
         run: |
